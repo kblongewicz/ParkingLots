@@ -1,0 +1,219 @@
+---
+title: "Parking Lots Paper"
+author: "Kelsey Blongewicz"
+date: "July 23, 2018"
+output:
+  rmarkdown::html_document:
+    css: custom.css
+---
+###Methods
+To detect parking lots across Long Island, we compared the performance of two different classification methods in terms of accuracy and data requirements. For each method, we sampled remote sensing data based on points corresponding to landscape feature classes of interest.  We refer to these landcover categories as classes, the data points as features, and the remote sensing data as variables.  All remote sensing analyses were performed in the Google Earth Engine platform for geospatial analysis (***CITE***).
+
+#####***Remote Sensing Data***
+We used top of atmosphere (TOA) reflectance collected by the Sentinel 2 (***CITE***) satellite system and radar backscatter collected by Sentinel 1 (***CITE***) as data for image classification. Data from each of these remote sensing systems is collected at 10 m resolution. 
+
+We obtained all Sentinel 2 images from 2017-07-01 to 2018-07-01 in which less than 20 percent of pixels were labeled as cloudy, as recorded in the image metadata.  We then masked clouds from these images using the QA band, and calculated the Normalized Difference Vegetation Index (NDVI) and Normalized Difference Snow Index (NDSI). To incorporate seasonal variation in reflectance values, we calculated the median pixel values for each of the visible, near-infrared and short wave infrared bands (Bands 2-4, 8, 11, and 12) as well as NDVI and NDSI within each of four three-month intervals, producing 32 Sentinel-2 variables (8 bands x 4 seasons) used for classification.  
+
+Satellite imagery from Sentinel 1 was processed by first selecting images with dual VV and VH polarization and calculating the mean pixel value from the most recent ascending and descending passes. Mean VV and VH bands from Sentinel 1 were added to the 32 Sentinel-2 variables, and we refer to this combined image as a sampling image.
+
+#####***Training Features***
+We imported building and parking lot layers from Google Open Street Maps as assets into Google Earth Engine. These contained 3808 parking lot and 5418 building polygons spanning Suffolk and Nassau counties on Long Island, which we used as features representing the 'Parking' and 'Building' classes, at which we sampled remote sensing variables. To distinguish parking lots from other broad landcover types, we sampled an additional 6,029 points randomly generated within two natural landcover classes. These classes were derived from the National Land Cover Database (***CITE***). We merged Deciduous, Evergreen, and Mixed Forests into a single 'Forest' class and combined Pasture/Hay, Cultivated Crops and Grassland into a single 'Grass' class. Within these two classes, we took a stratified random sample to select random points within Nassau county. 
+
+#####***Random Forest***
+To perform classification, we divided the data into distinct 30 percent model training and 30 percent model validation sets. A random forest classification method, with 20 decision trees per class, trained the model using the landcover labels of the training data, and both accuracy and kappa values were calculated from an error matrix based on the validation data. 
+
+#####***Deep Neural Networks***
+The same training and validation data collections used for random forest classification were also exported as TensorFlow records for use in a deep neural network (DNN), deploying the TensorFlow python library in a Jupyter Notebook in conjunction with Google Earth Engine. The established data structure, in the format of a dictionary, used exported band names and associated tensor values as the key and values, respectively, and a parsing function was mapped over the TFRecord files to read data into the defined dictionary. The classifier function had a learning rate of 0.05 with an adaptive gradient-based optimization and filtered the training dataset through three hidden layers with varying numbers of nodes. Finally, accuracy of the trained classifier was evaluated by running the validation data through the same classifier input function. 
+
+The architecture of the hidden layers was varied to maximize accuracy of the model. Using 34 bands as a baseline, modifications were made in the number of hidden layers, the number of nodes in each layer, and the gradational order of nodes across the layers. Of 19 trials with 34 bands, ten had decreasing numbers of nodes with each layer, five had increasing numbers of nodes, and four had either just one hidden layer or equal number of nodes across layers (Table 1). Based on initial hypotheses, runs started with the first layer having nodes equal to the number of input features, but that was reversed, reduced, and even increased in varying combinations. 
+
+#####***Data Subsets***
+To assess the amount of information necessary for each classification approach to achieve an acceptable level of accuracy, we varied the bands used as feature properties by each classifier. We divided all bands into three groups; Sentinel 1, seasonal Sentinel 2, and Sentinel 2, and sampling images consisting of all combinations of these band sets (Table 2).  Thus, the complete set consisted of 34 bands - two from Sentinel 1, and four sets of eight from Sentinel 2 including the visible, near infrared, shortwave infrared, NDVI and NDSI bands in each season. We then trained and tested the random forest classifier to each data subset. Based on results from the complete data set, We trained and tested the five DNN classifiers that exhibited the best performance using all data on each subset. We used each subset in DNN classifiers with hidden layers of 34, 7, and 5 nodes, respectively, before modifying nodes to match the number of input features for each subset. We trained and tested classifiers using nodes ascending across three layers to the maximum number of input features and with only one layer equal to that same number. Finally, we ran each data subset through a classifier with ascending but fewer number of nodes across three layers. 
+
+```{r message=FALSE, echo=FALSE, fig.align='center', fig.show='hold'}
+library(kableExtra)
+library(shiny)
+tables <- read.csv('C://Users/kblongewicz/Desktop/bands.csv', check.names = FALSE)
+nodes <- tables[, 5:10]
+names <- c("", "", "1", "2", "3", "")
+colnames(nodes) = names
+nodestable <- kable(nodes, format = "html", caption = "Table 1")%>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "condensed", "bordered", "responsive"), font_size=11)%>%
+  add_header_above(c("Dataset" = 1, "DNN Structure" = 1, "Nodes per Layer" = 3, "Max Accuracy" = 1), align = "l")
+nodestable
+```
+
+```{r message=FALSE, echo=FALSE}
+library(kableExtra)
+tables <- read.csv('C://Users/kblongewicz/Desktop/bands.csv', check.names = FALSE)
+bands <- tables[1:11, 1:3]
+bandstable <- kable(bands, format = "html", caption = "Table 2") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "condensed", "bordered", "responsive"), font_size=11)%>%
+  #add_header_above(c("Dataset" = 1, "Bands Included" = 2), align = "left") %>%
+  footnote(general = "* Sentinel 2 bands represent the median pixel values for the specified temporal range.", general_title = "")
+bandstable
+```
+
+###Results
+
+#####***Random Forest***
+By using the validation set of features in the classifier, we created an error matrix through which we calculated both accuracy and kappa values. With maximum accuracy and kappa values of 0.9067 and 0.8667, respectively, the complete data set performed best. However, the two subsets showed minimal decline in quality. The subset without seasonal Sentinel 2 features had an accuracy of 0.8960 and kappa of 0.8556, while the subset without Sentinel 1 features had an accuracy of 0.8956 and kappa of 0.8503.
+
+Additionally from the error matrix , we calculated the producer's and user's accuracies for each landcover class to determine the benefit of Sentinel 1 bands in distinguishing parking lots from buildings. When Sentinel 1 data was included, parking lots and buildings had producer's accuracies of 90.8363 percent and 91.6772 percent, respectively. Without Sentinel 1 variables, accuracies dropped to 88.2353 percent and 90.4249 percent for parking lots and buildings. 
+
+```{r echo=FALSE}
+library(shiny)
+fluidPage(
+  fluidRow(
+    column(6,
+           tags$figure(class="figure",
+                       tags$img(src="C:/Users/kblongewicz/Desktop/satellite.png"))),
+    column(6,
+           tags$img(src="C:/Users/kblongewicz/Desktop/result.png"))
+  ),
+  fluidRow(
+    column(12, p(class = "caption",
+        tags$b("Figure 1: Satellite image (left) and random forest class predictions (right). Parking lots, buildings, forest, and open ground are black, white, green, and yellow, respectively.")
+    ))
+))
+
+```
+```{r echo=FALSE, results = 'asis', fig.align='center', fig.cap='Satellite Image'}
+```
+
+#####***Deep Neural Network***
+To ensure sufficient model training, we generally ran the classifier for a minimum of 4 million steps, although, on average, only 1.1 million steps were required before accuracy of the validation data began to plateau. We determined this by visually inspecting graphs of the second derivatives of the accuracy for each trial. 
+
+We selected the five trials from each dataset with the highest accuracy and, of those 15, the highest performing was that without Sentinel 1 features and with only one hidden layer of 32 nodes. Its accuracy was 0.8872. That same dataset used in a classifier of three hidden layers of 5, 7, and 11 nodes had an accuracy of 0.8679. With just one hidden layer but 10 nodes, the accuracy of the dataset without seasonal Sentinel 2 features was 0.8564. The difference in accuracy between the highest and lowest performing trials was 0.1299, however, removing the two extreme values yielded a total difference of just 0.0595 (Table 1). 
+
+For the two data subsets - without Sentinel 1 and without seasonal Sentinel 2 - the most accurate DNN structure had only one hidden layer with nodes equal to the number of input features. This structure was less successful with the complete dataset, however, ranking just third. With the complete dataset, the highest accuracy was achieved with three hidden layers of 5, 7, and 34 nodes, respectively. This structure produced the lowest accuracy for the two data subsets. 
+
+```{r message=FALSE, echo=FALSE}
+library(plotly)
+library(shiny)
+variables <- read.csv('C://Users/kblongewicz/Desktop/alldata.csv')
+
+fluidPage(
+  fluidRow(
+    column(4,
+           plot_ly(type = 'scatter', mode = 'lines')%>%
+  add_trace(data = variables[variables$Dataset == "2",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumturquoise'), line = list(color = 'mediumturquoise'), name = "34,7,5")%>%
+  add_trace(data = variables[variables$Dataset == "5",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'steelblue'), line = list(color = 'steelblue'), name = "34,7,5")%>%
+  add_trace(data = variables[variables$Dataset == "1",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumblue'), line = list(color = 'mediumblue'), name = "5,7,34")%>%
+  add_trace(data = variables[variables$Dataset == "4",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumseagreen'), line = list(color = 'mediumseagreen'), name = "5,7,11")%>%
+  add_trace(data = variables[variables$Dataset == "3",], x= ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumpurple	'), line = list(color = 'mediumpurple	'), name = "34")%>%
+  layout(
+    title = "<b>Full Sample</b>", titlefont = list(size = "18"), 
+    legend = list(x = 0.5, y = 0.1, borderwidth = 1, font = list(size=10)),
+    xaxis = list(showline = TRUE, ticks = 'outside', showticklabels = TRUE, range = c(0, 4379500)),
+    yaxis = list(showline = TRUE, ticks = 'outside', showticklabels = TRUE, range = c(0, 1))
+  )
+    ),
+  column(4,
+         plot_ly(type = 'scatter', mode = 'lines')%>%
+  add_trace(data = variables[variables$Dataset == "32-3",], x= ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumpurple'), line = list(color = 'mediumpurple'), name = "34,7,5")%>%
+  add_trace(data = variables[variables$Dataset == "32-4",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumseagreen'), line = list(color = 'mediumseagreen'), name = "5,7,32")%>%
+  add_trace(data = variables[variables$Dataset == "32-5",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'steelblue'), line = list(color = 'steelblue'), name = "5,7,32")%>%
+  add_trace(data = variables[variables$Dataset == "32-2",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumturquoise'), line = list(color = 'mediumturquoise'), name = "5,7,11")%>%
+   add_trace(data = variables[variables$Dataset == "32-1",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumblue'), line = list(color = 'mediumblue'), name = "32")%>%
+  layout(
+    title = "<b>Without Sentinel 1</b>", titlefont = list(size = "18"), 
+    legend = list(x = 0.5, y = 0.1, borderwidth = 1, font = list(size=10)), 
+    xaxis = list(showline = TRUE, ticks = 'outside', showticklabels = TRUE, range = c(0, 4098100)),
+    yaxis = list(showline = TRUE, ticks = 'outside', showticklabels = TRUE, range = c(0, 1))
+  )
+  ),
+  column(4,
+         plot_ly(type = 'scatter', mode = 'lines')%>%
+  add_trace(data = variables[variables$Dataset == "10,3",], x= ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumpurple'), line = list(color = 'mediumpurple'), name = "34,7,5")%>%
+  add_trace(data = variables[variables$Dataset == "10, 2",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumturquoise'), line = list(color = 'mediumturquoise'), name = "34,7,5")%>%
+  add_trace(data = variables[variables$Dataset == "10, 5",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'steelblue'), line = list(color = 'steelblue'), name = "5,7,11")%>%
+  add_trace(data = variables[variables$Dataset == "10, 4",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumseagreen'), line = list(color = 'mediumseagreen'), name = "3,5,7")%>%
+  add_trace(data = variables[variables$Dataset == "10, 1",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumblue'), line = list(color = 'mediumblue'), name = "10")%>%
+  layout(
+    title = "<b>Without Seasons</b>", titlefont = list(size = "18"), 
+    legend = list(x = 0.5, y = 0.1, borderwidth = 1, font = list(size=10)),
+    xaxis = list(showline = TRUE, ticks = 'outside', showticklabels = TRUE, range = c(0, 4147300)),
+    yaxis = list(showline = TRUE, ticks = 'outside', showticklabels = TRUE, range = c(0, 1))
+  )
+  )),
+  fluidRow(
+    column(4,
+           plot_ly(type = 'scatter', mode = 'lines')%>%
+  add_trace(data = variables[variables$Dataset == "5/7/max -34",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumblue'), line = list(color = 'meduiumblue'), name = "Full Sample")%>%
+  add_trace(data = variables[variables$Dataset == "5/7/max -32",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumturquoise'), line = list(color = 'mediumturquoise'), name = "Without Sentinel 1")%>%
+  add_trace(data = variables[variables$Dataset == "5/7/max -10",], x= ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumpurple'), line = list(color = 'mediumpurple'), name = "Without Seasons")%>%
+  layout(
+    title = "<b>Ascending to Max</b>", titlefont = list(size = "18"), 
+    legend = list(x = 0.2, y = 0.1, borderwidth = 1, font = list(size=10)),
+    xaxis = list(showline = TRUE, ticks = 'outside', showticklabels = TRUE, range = c(0, 4312800)),
+    yaxis = list(showline = TRUE, ticks = 'outside', showticklabels = TRUE, range = c(0, 1))
+  )
+    ),
+  column(4,
+         plot_ly(type = 'scatter', mode = 'lines')%>%
+  add_trace(data = variables[variables$Dataset == "34/7/5-34",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumblue'), line = list(color = 'mediumblue'), name = "Full Sample")%>%
+  add_trace(data = variables[variables$Dataset == "34/7/5-32",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumturquoise'), line = list(color = 'mediumturquoise'), name = "Without Sentinel 1")%>%
+  add_trace(data = variables[variables$Dataset == "34/7/5-10",], x= ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumpurple'), line = list(color = 'mediumpurple'), name = "Without Seasons")%>%
+  layout(
+    title = "<b>Descending</b>", titlefont = list(size = "18"), 
+    legend = list(x = 0.2, y = 0.1, borderwidth = 1, font = list(size=10)),
+    xaxis = list(showline = TRUE, ticks = 'outside', showticklabels = TRUE, range = c(0, 4169999)),
+    yaxis = list(showline = TRUE, ticks = 'outside', showticklabels = TRUE, range = c(0, 1))
+  )
+  ),
+  column(4,
+         plot_ly(type = 'scatter', mode = 'lines')%>%
+  add_trace(data = variables[variables$Dataset == "1, 34",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumblue'), line = list(color = 'mediumblue'), name = "Full Sample")%>%
+  add_trace(data = variables[variables$Dataset == "1, 32",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumturquoise'), line = list(color = 'mediumturquoise'), name = "Without Sentinel 1")%>%
+  add_trace(data = variables[variables$Dataset == "1, 10",], x= ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumpurple'), line = list(color = 'mediumpurple'), name = "Without Seasons")%>%
+  layout(
+    title = "<b>One Hidden Layer</b>", titlefont = list(size = "18"), 
+    legend = list(x = 0.2, y = 0.1, borderwidth = 1, font = list(size=10)),
+    xaxis = list(showline = TRUE, ticks = 'outside', showticklabels = TRUE, range = c(0, 4257601)),
+    yaxis = list(showline = TRUE, ticks = 'outside', showticklabels = TRUE, range = c(0, 1))
+  )
+  )
+  )
+)
+
+graph7 <- plot_ly(type = 'scatter', mode = 'lines')%>%
+  add_trace(data = variables[variables$Dataset == "5/7/less -34",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumblue'), line = list(color = 'mediumblue'), name = "Full Sample")%>%
+  add_trace(data = variables[variables$Dataset == "5/7/less -32",], x = ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumturquoise'), line = list(color = 'mediumturquoise'), name = "Without Sentinel 1")%>%
+  add_trace(data = variables[variables$Dataset == "5/7/less-10",], x= ~Runs, y = ~Accuracy,
+            marker = list(color = 'mediumpurple'), line = list(color = 'mediumpurple'), name = "Without Seasons")%>%
+  layout(
+    title = "<b>Ascending</b>", titlefont = list(size = "18"), 
+    legend = list(x = 0.5, y = 0.1, borderwidth = 1),
+    xaxis = list(showline = TRUE, ticks = 'outside', showticklabels = TRUE, range = c(0, 4099999)),
+    yaxis = list(showline = TRUE, ticks = 'outside', showticklabels = TRUE, range = c(0, 1))
+  )
+
+
+```

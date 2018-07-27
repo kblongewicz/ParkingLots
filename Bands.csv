@@ -1,0 +1,36 @@
+Dataset,Bands Included,,,,,1,2,3,
+Full Sample,Sentinel 1,"VV, VH",,Full Sample,3 Hidden Layers,34,7,5,0.8387
+,Sentinel 2,"Q1: B2, B3, B4, B8, B11, B12, NDVI, NDSI",,,,34,7,5,0.6223
+,,"Q2: B2, B3, B4, B8, B11, B12, NDVI, NDSI",,,,34,7,5,0.5908
+,,"Q3: B2, B3, B4, B8, B11, B12, NDVI, NDSI",,,,34,7,5,0.6682
+,,"Q4: B2, B3, B4, B8, B11, B12, NDVI, NDSI",,,,34,7,5,0.8084
+Without Sentinel 1,Sentinel 2,"Q1: B2, B3, B4, B8, B11, B12, NDVI, NDSI",,,,34,32,30,0.7171
+,,"Q2: B2, B3, B4, B8, B11, B12, NDVI, NDSI",,,,36,7,5,0.6706
+,,"Q3: B2, B3, B4, B8, B11, B12, NDVI, NDSI",,,,11,7,5,0.6994
+,,"Q4: B2, B3, B4, B8, B11, B12, NDVI, NDSI",,,,9,7,5,0.6985
+Without Seasons,Sentinel 1,"VV, VH",,,,5,7,34,0.7723
+,Sentinel 2,"Annual: B2, B3, B4, B8, B11, B12, NDVI, NDSI",,,,5,7,34,0.8550
+,,,,,,21,30,34,0.7012
+*Sentinel 2 bands represent the median pixel values for the specified temporal range.,,,,,,5,7,11,0.8223
+,,,,,,5,5,5,0.7961
+,,,,,,34,34,34,0.6913
+,,,,,2 Hidden Layers,34,7,,0.6825
+,,,,,,7,34,,0.8150
+,,,,,,34,34,,0.6643
+,,,,,1 Hidden Layer,34,,,0.8369
+,,,,Without Sentinel 1,3 Hidden Layers,34,7,5,0.8330
+,,,,,,34,7,5,0.8077
+,,,,,,34,7,5,0.8074
+,,,,,,34,7,5,0.7727
+,,,,,,34,7,5,0.8542
+,,,,,,36,7,5,0.6710
+,,,,,,5,7,32,0.8469
+,,,,,,5,7,32,0.8359
+,,,,,,5,7,11,0.8679
+,,,,,1 Hidden Layer,32,,,0.8872
+,,,,Without Seasons,3 Hidden Layers,34,7,5,0.8483
+,,,,,,34,7,5,0.8301
+,,,,,,10,7,5,0.6983
+,,,,,,5,7,10,0.7572
+,,,,,,3,5,7,0.8259
+,,,,,1 Hidden Layer,10,,,0.8564
